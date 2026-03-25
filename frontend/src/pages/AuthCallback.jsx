@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth, API } from "../App";
+import { toast } from "sonner";
 
 export default function AuthCallback() {
   const navigate = useNavigate();
@@ -36,11 +37,40 @@ export default function AuthCallback() {
         }
 
         const data = await response.json();
-        const user = data.user;
-        setUser(user);
+        let user = data.user;
 
         // Clear the hash from URL
         window.history.replaceState(null, "", window.location.pathname);
+
+        // Check if there's a pending role from the landing page
+        const pendingRole = sessionStorage.getItem("pendingRole");
+        
+        if (pendingRole && !user.role) {
+          // Auto-assign the role selected before OAuth
+          try {
+            const roleResponse = await fetch(`${API}/auth/select-role`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              credentials: "include",
+              body: JSON.stringify({ 
+                role: pendingRole, 
+                display_name: user.name || "Utilisateur" 
+              }),
+            });
+
+            if (roleResponse.ok) {
+              user = await roleResponse.json();
+              toast.success(`Bienvenue en tant que ${pendingRole === 'clipper' ? 'Clippeur' : pendingRole === 'agency' ? 'Agence' : pendingRole === 'manager' ? 'Manager' : 'Client'} !`);
+            }
+          } catch (error) {
+            console.error("Error assigning role:", error);
+          }
+          
+          // Clear the pending role
+          sessionStorage.removeItem("pendingRole");
+        }
+
+        setUser(user);
 
         // Redirect based on user state
         if (!user.role) {

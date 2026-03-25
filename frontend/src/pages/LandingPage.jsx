@@ -1,12 +1,47 @@
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../App";
-import { motion } from "framer-motion";
-import { Play, Users, Zap, TrendingUp, ChevronRight, Video, DollarSign, BarChart3 } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { Play, Users, Zap, TrendingUp, ChevronRight, Video, DollarSign, BarChart3, Building2, Eye, X } from "lucide-react";
 import { Button } from "../components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../components/ui/dialog";
 
 export default function LandingPage() {
   const navigate = useNavigate();
   const { user, login } = useAuth();
+  const [showRoleModal, setShowRoleModal] = useState(false);
+  const [selectedRole, setSelectedRole] = useState(null);
+
+  const roles = [
+    {
+      id: "clipper",
+      title: "Clippeur",
+      icon: Video,
+      color: "#00E5FF",
+      description: "Je crée des clips et je veux être rémunéré selon mes vues",
+    },
+    {
+      id: "agency",
+      title: "Agence",
+      icon: Building2,
+      color: "#FF007F",
+      description: "Je gère des campagnes de clipping et des équipes de clippeurs",
+    },
+    {
+      id: "manager",
+      title: "Manager",
+      icon: Users,
+      color: "#39FF14",
+      description: "Je supervise des clippeurs et je donne des conseils",
+    },
+    {
+      id: "client",
+      title: "Client",
+      icon: Eye,
+      color: "#FFB300",
+      description: "Je suis créateur/influenceur et je veux suivre mes campagnes",
+    },
+  ];
 
   const handleGetStarted = () => {
     if (user) {
@@ -16,6 +51,19 @@ export default function LandingPage() {
         navigate("/select-role");
       }
     } else {
+      // Show role selection modal before login
+      setShowRoleModal(true);
+    }
+  };
+
+  const handleRoleSelect = (roleId) => {
+    setSelectedRole(roleId);
+  };
+
+  const handleContinueWithRole = () => {
+    if (selectedRole) {
+      // Store selected role in sessionStorage before OAuth
+      sessionStorage.setItem("pendingRole", selectedRole);
       login();
     }
   };
@@ -343,6 +391,76 @@ export default function LandingPage() {
           <p className="text-sm text-white/40">© 2025 The Clip Deal Track. Tous droits réservés.</p>
         </div>
       </footer>
+
+      {/* Role Selection Modal */}
+      <Dialog open={showRoleModal} onOpenChange={setShowRoleModal}>
+        <DialogContent className="bg-[#121212] border-white/10 max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="font-display font-bold text-2xl text-white text-center">
+              Qui êtes-vous ?
+            </DialogTitle>
+            <p className="text-white/50 text-center mt-2">
+              Choisissez votre rôle pour commencer
+            </p>
+          </DialogHeader>
+          
+          <div className="grid sm:grid-cols-2 gap-4 mt-6">
+            {roles.map((role) => (
+              <button
+                key={role.id}
+                onClick={() => handleRoleSelect(role.id)}
+                data-testid={`modal-role-${role.id}`}
+                className={`relative p-5 rounded-xl border text-left transition-all duration-200 ${
+                  selectedRole === role.id
+                    ? "bg-white/10 scale-[1.02]"
+                    : "bg-white/5 border-white/10 hover:border-white/20 hover:bg-white/[0.07]"
+                }`}
+                style={{
+                  borderColor: selectedRole === role.id ? role.color : undefined,
+                  boxShadow: selectedRole === role.id ? `0 0 20px ${role.color}30` : undefined,
+                }}
+              >
+                <div
+                  className="w-10 h-10 rounded-lg flex items-center justify-center mb-3"
+                  style={{ backgroundColor: `${role.color}20` }}
+                >
+                  <role.icon className="w-5 h-5" style={{ color: role.color }} />
+                </div>
+                <h3 className="font-display font-bold text-white mb-1">
+                  {role.title}
+                </h3>
+                <p className="text-sm text-white/50 leading-relaxed">
+                  {role.description}
+                </p>
+                {selectedRole === role.id && (
+                  <motion.div
+                    initial={{ scale: 0 }}
+                    animate={{ scale: 1 }}
+                    className="absolute top-3 right-3 w-5 h-5 rounded-full flex items-center justify-center"
+                    style={{ backgroundColor: role.color }}
+                  >
+                    <ChevronRight className="w-3 h-3 text-black" />
+                  </motion.div>
+                )}
+              </button>
+            ))}
+          </div>
+
+          <Button
+            onClick={handleContinueWithRole}
+            disabled={!selectedRole}
+            data-testid="modal-continue-btn"
+            className={`w-full mt-6 py-6 font-bold rounded-xl text-lg transition-all duration-200 ${
+              selectedRole 
+                ? "bg-white text-black hover:bg-white/90" 
+                : "bg-white/10 text-white/50 cursor-not-allowed"
+            }`}
+          >
+            Continuer avec Google
+            <ChevronRight className="w-5 h-5 ml-2" />
+          </Button>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
