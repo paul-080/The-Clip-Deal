@@ -2,8 +2,9 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../App";
 import { motion, AnimatePresence } from "framer-motion";
-import { Play, Users, Zap, TrendingUp, ChevronRight, Video, DollarSign, BarChart3, Building2, Eye, X } from "lucide-react";
+import { Play, Users, Zap, TrendingUp, ChevronRight, Video, DollarSign, BarChart3, Building2, Eye, X, ArrowLeft } from "lucide-react";
 import { Button } from "../components/ui/button";
+import { Input } from "../components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../components/ui/dialog";
 
 export default function LandingPage() {
@@ -11,6 +12,15 @@ export default function LandingPage() {
   const { user, login } = useAuth();
   const [showRoleModal, setShowRoleModal] = useState(false);
   const [selectedRole, setSelectedRole] = useState(null);
+  const [step, setStep] = useState(1); // 1 = role selection, 2 = form
+  
+  // Form fields
+  const [formData, setFormData] = useState({
+    firstName: "",
+    lastName: "",
+    pseudo: "",
+    agencyName: "",
+  });
 
   const roles = [
     {
@@ -51,8 +61,10 @@ export default function LandingPage() {
         navigate("/select-role");
       }
     } else {
-      // Show role selection modal before login
       setShowRoleModal(true);
+      setStep(1);
+      setSelectedRole(null);
+      setFormData({ firstName: "", lastName: "", pseudo: "", agencyName: "" });
     }
   };
 
@@ -60,13 +72,39 @@ export default function LandingPage() {
     setSelectedRole(roleId);
   };
 
-  const handleContinueWithRole = () => {
+  const handleNextStep = () => {
     if (selectedRole) {
-      // Store selected role in sessionStorage before OAuth
+      setStep(2);
+    }
+  };
+
+  const handleBackStep = () => {
+    setStep(1);
+  };
+
+  const handleFormChange = (field, value) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  const isFormValid = () => {
+    if (selectedRole === "agency") {
+      return formData.agencyName.trim().length > 0;
+    }
+    return formData.firstName.trim().length > 0 && 
+           formData.lastName.trim().length > 0 && 
+           formData.pseudo.trim().length > 0;
+  };
+
+  const handleContinueWithRole = () => {
+    if (selectedRole && isFormValid()) {
+      // Store selected role and form data in sessionStorage before OAuth
       sessionStorage.setItem("pendingRole", selectedRole);
+      sessionStorage.setItem("pendingFormData", JSON.stringify(formData));
       login();
     }
   };
+
+  const selectedRoleData = roles.find(r => r.id === selectedRole);
 
   return (
     <div className="min-h-screen bg-[#0A0A0A] overflow-hidden relative">
@@ -395,70 +433,193 @@ export default function LandingPage() {
       {/* Role Selection Modal */}
       <Dialog open={showRoleModal} onOpenChange={setShowRoleModal}>
         <DialogContent className="bg-[#121212] border-white/10 max-w-2xl">
-          <DialogHeader>
-            <DialogTitle className="font-display font-bold text-2xl text-white text-center">
-              Qui êtes-vous ?
-            </DialogTitle>
-            <p className="text-white/50 text-center mt-2">
-              Choisissez votre rôle pour commencer
-            </p>
-          </DialogHeader>
-          
-          <div className="grid sm:grid-cols-2 gap-4 mt-6">
-            {roles.map((role) => (
-              <button
-                key={role.id}
-                onClick={() => handleRoleSelect(role.id)}
-                data-testid={`modal-role-${role.id}`}
-                className={`relative p-5 rounded-xl border text-left transition-all duration-200 ${
-                  selectedRole === role.id
-                    ? "bg-white/10 scale-[1.02]"
-                    : "bg-white/5 border-white/10 hover:border-white/20 hover:bg-white/[0.07]"
-                }`}
-                style={{
-                  borderColor: selectedRole === role.id ? role.color : undefined,
-                  boxShadow: selectedRole === role.id ? `0 0 20px ${role.color}30` : undefined,
-                }}
+          <AnimatePresence mode="wait">
+            {step === 1 ? (
+              <motion.div
+                key="step1"
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
               >
-                <div
-                  className="w-10 h-10 rounded-lg flex items-center justify-center mb-3"
-                  style={{ backgroundColor: `${role.color}20` }}
-                >
-                  <role.icon className="w-5 h-5" style={{ color: role.color }} />
+                <DialogHeader>
+                  <DialogTitle className="font-display font-bold text-2xl text-white text-center">
+                    Qui êtes-vous ?
+                  </DialogTitle>
+                  <p className="text-white/50 text-center mt-2">
+                    Choisissez votre rôle pour commencer
+                  </p>
+                </DialogHeader>
+                
+                <div className="grid sm:grid-cols-2 gap-4 mt-6">
+                  {roles.map((role) => (
+                    <button
+                      key={role.id}
+                      onClick={() => handleRoleSelect(role.id)}
+                      data-testid={`modal-role-${role.id}`}
+                      className={`relative p-5 rounded-xl border text-left transition-all duration-200 ${
+                        selectedRole === role.id
+                          ? "bg-white/10 scale-[1.02]"
+                          : "bg-white/5 border-white/10 hover:border-white/20 hover:bg-white/[0.07]"
+                      }`}
+                      style={{
+                        borderColor: selectedRole === role.id ? role.color : undefined,
+                        boxShadow: selectedRole === role.id ? `0 0 20px ${role.color}30` : undefined,
+                      }}
+                    >
+                      <div
+                        className="w-10 h-10 rounded-lg flex items-center justify-center mb-3"
+                        style={{ backgroundColor: `${role.color}20` }}
+                      >
+                        <role.icon className="w-5 h-5" style={{ color: role.color }} />
+                      </div>
+                      <h3 className="font-display font-bold text-white mb-1">
+                        {role.title}
+                      </h3>
+                      <p className="text-sm text-white/50 leading-relaxed">
+                        {role.description}
+                      </p>
+                      {selectedRole === role.id && (
+                        <motion.div
+                          initial={{ scale: 0 }}
+                          animate={{ scale: 1 }}
+                          className="absolute top-3 right-3 w-5 h-5 rounded-full flex items-center justify-center"
+                          style={{ backgroundColor: role.color }}
+                        >
+                          <ChevronRight className="w-3 h-3 text-black" />
+                        </motion.div>
+                      )}
+                    </button>
+                  ))}
                 </div>
-                <h3 className="font-display font-bold text-white mb-1">
-                  {role.title}
-                </h3>
-                <p className="text-sm text-white/50 leading-relaxed">
-                  {role.description}
-                </p>
-                {selectedRole === role.id && (
-                  <motion.div
-                    initial={{ scale: 0 }}
-                    animate={{ scale: 1 }}
-                    className="absolute top-3 right-3 w-5 h-5 rounded-full flex items-center justify-center"
-                    style={{ backgroundColor: role.color }}
-                  >
-                    <ChevronRight className="w-3 h-3 text-black" />
-                  </motion.div>
-                )}
-              </button>
-            ))}
-          </div>
 
-          <Button
-            onClick={handleContinueWithRole}
-            disabled={!selectedRole}
-            data-testid="modal-continue-btn"
-            className={`w-full mt-6 py-6 font-bold rounded-xl text-lg transition-all duration-200 ${
-              selectedRole 
-                ? "bg-white text-black hover:bg-white/90" 
-                : "bg-white/10 text-white/50 cursor-not-allowed"
-            }`}
-          >
-            Continuer avec Google
-            <ChevronRight className="w-5 h-5 ml-2" />
-          </Button>
+                <Button
+                  onClick={handleNextStep}
+                  disabled={!selectedRole}
+                  data-testid="modal-next-btn"
+                  className={`w-full mt-6 py-6 font-bold rounded-xl text-lg transition-all duration-200 ${
+                    selectedRole 
+                      ? "bg-white text-black hover:bg-white/90" 
+                      : "bg-white/10 text-white/50 cursor-not-allowed"
+                  }`}
+                >
+                  Suivant
+                  <ChevronRight className="w-5 h-5 ml-2" />
+                </Button>
+              </motion.div>
+            ) : (
+              <motion.div
+                key="step2"
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: 20 }}
+              >
+                <DialogHeader>
+                  <div className="flex items-center gap-3 mb-2">
+                    <button 
+                      onClick={handleBackStep}
+                      className="p-2 rounded-lg hover:bg-white/10 text-white/50 hover:text-white transition-colors"
+                    >
+                      <ArrowLeft className="w-5 h-5" />
+                    </button>
+                    <div 
+                      className="w-10 h-10 rounded-lg flex items-center justify-center"
+                      style={{ backgroundColor: `${selectedRoleData?.color}20` }}
+                    >
+                      {selectedRoleData && <selectedRoleData.icon className="w-5 h-5" style={{ color: selectedRoleData.color }} />}
+                    </div>
+                    <DialogTitle className="font-display font-bold text-xl text-white">
+                      Inscription {selectedRoleData?.title}
+                    </DialogTitle>
+                  </div>
+                  <p className="text-white/50 text-sm ml-14">
+                    Complétez vos informations pour continuer
+                  </p>
+                </DialogHeader>
+                
+                <div className="space-y-4 mt-6">
+                  {selectedRole === "agency" ? (
+                    // Agency form
+                    <div>
+                      <label className="block text-sm text-white/70 mb-2">
+                        Nom de l'agence *
+                      </label>
+                      <Input
+                        value={formData.agencyName}
+                        onChange={(e) => handleFormChange("agencyName", e.target.value)}
+                        placeholder="Ex: Clip Factory"
+                        className="bg-white/5 border-white/10 text-white placeholder:text-white/30 py-6"
+                        data-testid="input-agency-name"
+                      />
+                    </div>
+                  ) : (
+                    // Clipper, Manager, Client form
+                    <>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-sm text-white/70 mb-2">
+                            Prénom *
+                          </label>
+                          <Input
+                            value={formData.firstName}
+                            onChange={(e) => handleFormChange("firstName", e.target.value)}
+                            placeholder="Jean"
+                            className="bg-white/5 border-white/10 text-white placeholder:text-white/30 py-6"
+                            data-testid="input-first-name"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm text-white/70 mb-2">
+                            Nom *
+                          </label>
+                          <Input
+                            value={formData.lastName}
+                            onChange={(e) => handleFormChange("lastName", e.target.value)}
+                            placeholder="Dupont"
+                            className="bg-white/5 border-white/10 text-white placeholder:text-white/30 py-6"
+                            data-testid="input-last-name"
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block text-sm text-white/70 mb-2">
+                          Pseudo *
+                        </label>
+                        <Input
+                          value={formData.pseudo}
+                          onChange={(e) => handleFormChange("pseudo", e.target.value)}
+                          placeholder="@monpseudo"
+                          className="bg-white/5 border-white/10 text-white placeholder:text-white/30 py-6"
+                          data-testid="input-pseudo"
+                        />
+                        <p className="text-xs text-white/40 mt-1">
+                          Ce pseudo sera visible par les autres utilisateurs
+                        </p>
+                      </div>
+                    </>
+                  )}
+                </div>
+
+                <Button
+                  onClick={handleContinueWithRole}
+                  disabled={!isFormValid()}
+                  data-testid="modal-continue-btn"
+                  className={`w-full mt-6 py-6 font-bold rounded-xl text-lg transition-all duration-200`}
+                  style={{
+                    backgroundColor: isFormValid() ? selectedRoleData?.color : "rgba(255,255,255,0.1)",
+                    color: isFormValid() ? "#000" : "rgba(255,255,255,0.5)",
+                  }}
+                >
+                  <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24">
+                    <path fill="currentColor" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                    <path fill="currentColor" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                    <path fill="currentColor" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                    <path fill="currentColor" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                  </svg>
+                  Continuer avec Google
+                </Button>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </DialogContent>
       </Dialog>
     </div>

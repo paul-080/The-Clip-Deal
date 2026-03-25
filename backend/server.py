@@ -895,6 +895,58 @@ async def create_advice(advice_data: AdviceCreate, user: dict = Depends(get_curr
 
 # ================= MANAGER REMINDER =================
 
+@api_router.get("/campaigns/{campaign_id}/clippers-advice-status")
+async def get_clippers_advice_status(campaign_id: str, user: dict = Depends(get_current_user)):
+    """Get clippers in a campaign with their advice status (for agency/manager)"""
+    if user.get("role") not in ["agency", "manager"]:
+        raise HTTPException(status_code=403, detail="Agency or Manager only")
+    
+    # Get clipper members
+    members = await db.campaign_members.find(
+        {"campaign_id": campaign_id, "role": "clipper", "status": "active"},
+        {"_id": 0}
+    ).to_list(100)
+    
+    clippers = []
+    for member in members:
+        clipper_user = await db.users.find_one(
+            {"user_id": member["user_id"]},
+            {"_id": 0, "user_id": 1, "name": 1, "email": 1, "display_name": 1, "picture": 1}
+        )
+        
+        if clipper_user:
+            # Get last advice for this clipper in this campaign
+            last_advice = await db.advices.find_one(
+                {
+                    "campaign_id": campaign_id,
+                    "recipient_ids": member["user_id"]
+                },
+                {"_id": 0},
+                sort=[("created_at", -1)]
+            )
+            
+            hours_since_advice = None
+            needs_advice = True
+            
+            if last_advice:
+                last_time = datetime.fromisoformat(last_advice["created_at"])
+                if last_time.tzinfo is None:
+                    last_time = last_time.replace(tzinfo=timezone.utc)
+                hours_since_advice = (datetime.now(timezone.utc) - last_time).total_seconds() / 3600
+                needs_advice = hours_since_advice >= 72
+            
+            clippers.append({
+                **clipper_user,
+                "hours_since_advice": round(hours_since_advice, 1) if hours_since_advice else None,
+                "needs_advice": needs_advice,
+                "last_advice_at": last_advice["created_at"] if last_advice else None
+            })
+    
+    # Sort: those needing advice first, then by hours since last advice (descending)
+    clippers.sort(key=lambda x: (not x["needs_advice"], -(x["hours_since_advice"] or 9999)))
+    
+    return {"clippers": clippers}
+
 @api_router.get("/manager/reminder-status")
 async def get_reminder_status(user: dict = Depends(get_current_user)):
     if user.get("role") != "manager":

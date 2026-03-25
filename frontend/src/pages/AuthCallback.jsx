@@ -44,8 +44,25 @@ export default function AuthCallback() {
 
         // Check if there's a pending role from the landing page
         const pendingRole = sessionStorage.getItem("pendingRole");
+        const pendingFormDataStr = sessionStorage.getItem("pendingFormData");
         
         if (pendingRole && !user.role) {
+          // Parse form data
+          let displayName = user.name || "Utilisateur";
+          if (pendingFormDataStr) {
+            try {
+              const formData = JSON.parse(pendingFormDataStr);
+              if (pendingRole === "agency") {
+                displayName = formData.agencyName || displayName;
+              } else {
+                // For clipper, manager, client - use pseudo or full name
+                displayName = formData.pseudo || `${formData.firstName} ${formData.lastName}`.trim() || displayName;
+              }
+            } catch (e) {
+              console.error("Error parsing form data:", e);
+            }
+          }
+          
           // Auto-assign the role selected before OAuth
           try {
             const roleResponse = await fetch(`${API}/auth/select-role`, {
@@ -54,20 +71,21 @@ export default function AuthCallback() {
               credentials: "include",
               body: JSON.stringify({ 
                 role: pendingRole, 
-                display_name: user.name || "Utilisateur" 
+                display_name: displayName
               }),
             });
 
             if (roleResponse.ok) {
               user = await roleResponse.json();
-              toast.success(`Bienvenue en tant que ${pendingRole === 'clipper' ? 'Clippeur' : pendingRole === 'agency' ? 'Agence' : pendingRole === 'manager' ? 'Manager' : 'Client'} !`);
+              toast.success(`Bienvenue ${displayName} !`);
             }
           } catch (error) {
             console.error("Error assigning role:", error);
           }
           
-          // Clear the pending role
+          // Clear the pending data
           sessionStorage.removeItem("pendingRole");
+          sessionStorage.removeItem("pendingFormData");
         }
 
         setUser(user);
